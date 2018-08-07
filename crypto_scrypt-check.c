@@ -5,7 +5,7 @@
 
 #include "b64.h"
 #include "slowequals.h"
-#include "libscrypt.h"
+#include "scrypt.h"
 
 #ifdef _WIN32
 /* On windows, strtok uses a thread-local static variable in strtok to

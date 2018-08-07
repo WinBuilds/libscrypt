@@ -1,34 +1,35 @@
-libscrypt
-=========
-Linux scrypt shared library.
+# The scrypt hashing library
 
-Full credit to algorithm designer and example code from Colin Percival here:
-http://www.tarsnap.com/scrypt.html
+* This is a fork of Colin Percival's scrypt hashing library. The original repository
+is found here:
+[http://www.tarsnap.com/scrypt.html](http://www.tarsnap.com/scrypt.html)
 
-Utilises BASE64 encoding library from ISC.
+* Utilises BASE64 encoding library from ISC.
 
-Official project page, including stable tarballs found here:
-http://www.lolware.net/libscrypt.html
+* Official project page, including stable tarballs are found here:<br>
+[http://www.lolware.net/libscrypt.html](http://www.lolware.net/libscrypt.html)
 
-Simple hashing interface
+### Simple hashing interface
 
-The (reference) internal hashing function can be directly called as follows:
+The reference hashing function can be directly called as follows:
 
     int libscrypt_scrypt(const uint8_t *passwd, size_t passwdlen,
-            const uint8_t *salt, size_t saltlen, uint64_t N, uint32_t r, 
-            uint32_t p, /*@out@*/ uint8_t *buf, size_t buflen);
+       const uint8_t *salt, size_t saltlen, uint64_t N, uint32_t r, 
+       uint32_t p, /*@out@*/ uint8_t *buf, size_t buflen);
 
-Libscrypt's easier to use interface wraps this up to deal with the salt and produce BASE64 output as so:
+scryptlib's easier to use interface wraps this up to deal with the salt and produce BASE64 output as so:
 
-    int libscrypt_hash(char *dst, char *passphrase, uint32_t N, uint8_t r, uint8_t p);
+    int libscrypt_hash(char *dst, char *passphrase, 
+       uint32_t N, uint8_t r, uint8_t p);
 
 Sane constants have been created for N, r and p so you can create a hash like this:
 
-    libscrypt_hash(outbuf, "My cats's breath smells like cat food", SCRYPT_N, SCRYPT_r, SCRYPT_p);
+    libscrypt_hash(outbuf, "My cats's breath smells like cat food", 
+       SCRYPT_N, SCRYPT_r, SCRYPT_p);
 
-This function sets errno as required for any error conditions.
+This function sets `errno` as required for any error conditions.
 
-Output stored in "outbuf" is stored in a standardised MCF form, which means includes the randomly created, 128 bit salt, all N, r and p values, and a BASE64 encoded version of the hash. The entire MCF can be stored in a database, and compared for use as below:
+Output stored in `outbuf` is stored in a standardised MCF form, which means includes the randomly created, 128 bit salt, all N, r and p values, and a BASE64 encoded version of the hash. The entire MCF can be stored in a database, and compared for use as below:
 
     retval = libscrypt_check(mcf, "pleasefailme");
     retval < 0 error
@@ -40,70 +41,170 @@ mcf should be defined as at least SCRYPT_MCF_LEN in size.
 Note that libscrypt_check needs to modify the mcf string and will not return it
 to the original state. Pass it a copy if you need to keep the original mcf.
 
-A number of internal functions are exposed, and users wishing to create more complex use cases should consult the header file, which is aimed at documenting the API fully.
+A number of internal functions are exposed, and users wishing to create more complex use cases should consult the header file, which documents the API.
 
-The test reference is also aimed at providing a well documented use case.
-Building
---------
+The test code provides a well documented use case.
+
+# Building
+
     make
     make check
+
 Check the Makefile for advice on linking against your application.
 
-OSX
------
+### Building on OSX
 Please compile and install with:
 
     make LDFLAGS= CFLAGS_EXTRA=
     make install-osx
 
+# BUGS
 
-BUGS
-----
-SCRYPT_* constants are probably a little high for something like a Raspberry pi. Using '1' as SCRYPT_p is acceptable from a security and performance standpoint if needed. 
-Experiments were performed with using memset() to zero out passwords as they were checked. This often caused issues with calling applications where the password based have been passed as a const*. We highly recommend implementing your own zeroing function the moment this library is called.
+* SCRYPT_* constants are too high for Raspberry pi. Using '1' as SCRYPT_p is acceptable from a security and performance standpoint. 
 
-There is apparently an issue when used on Samsung (and perhaps Android in general) devices. See [this issue](https://github.com/technion/libscrypt/issues/39) for more information.
-
-Notes on Code Development
-------------------------
-
-Code is now declared "stable", the master branch will always be "stable" and development will be done on branches.
-The reference machines are Fedora, CentOS, FreeBSD and Raspbian, and the code is expected to compile and run on all of these before being moved to stable branch.
-Full transparancy on the regular application of thorough testing can be found by reviewing recent test harness results here:
-http://www.lolware.net/libscrypttesting.txt
-
-Please, no more pull requests for Windows compatibility. If it's important to you - fork the project. I have no intention of pulling an OpenSSL and becoming a maze of ifdefs for platforms I don't even have a build environment for.
-
-I utilise Facebook's "infer" static analyser, in addition to clang's analyzer. Command to run is:
-
-    infer -- make
-
-Contact
--------
-I can be contacted at: technion@lolware.net
-
-If required, my GPG key can be found at: https://lolware.net/technion-GPG-KEY
-
-Future releases will have the Git tag signed.
+* Using `memset()` to zero out passwords may cause issues with calling applications that pass the password in as a `const*`. 
 
 
-Changenotes
------------
-v1.1a: Single Makefile line change. I wouldn't ordinarily tag this as a new "release", but the purpose here is to assist with packaging in distributions.
+# The scrypt key derivation function
 
-v1.12: The static library is built, but no longer installed by default. You can install it with "make install-static". This is because static libraries are not typically bundled in packages.
+The scrypt key derivation function was originally developed for use in the
+[Tarsnap online backup system](https://www.tarsnap.com/index.html) and is
+designed to be far more secure against hardware brute-force attacks than
+alternative functions such as [PBKDF2](https://en.wikipedia.org/wiki/PBKDF2) or
+[bcrypt](https://www.openbsd.org/papers/bcrypt-paper.ps).
 
-v1.13: Minor packaging related update
+We estimate that on modern (2009) hardware, if 5 seconds are spent computing a
+derived key, the cost of a hardware brute-force attack against `scrypt` is
+roughly 4000 times greater than the cost of a similar attack against bcrypt (to
+find the same password), and 20000 times greater than a similar attack against
+PBKDF2.  If the `scrypt` encryption utility is used with default parameters,
+the cost of cracking the password on a file encrypted by `scrypt enc` is
+approximately 100 billion times more than the cost of cracking the same
+password on a file encrypted by `openssl enc`; this means that a five-character
+password using `scrypt` is stronger than a ten-character password using
+`openssl`.
 
-v1.15: Replaced the b64 libraries with more portable one from ISC. Now tested and verified on a wider variety of architectures. Note, libscrypt_b64_encrypt was originally an exported function. This is no longer the case as it is considered an internal function only.
+Details of the `scrypt` key derivation function are given in:
 
-v1.18: God damnit Apple
+* The Internet Engineering Task Force (IETF)
+  [RFC 7914: The scrypt Password-Based Key Derivation Function](
+  https://tools.ietf.org/html/rfc7914).
+* The original conference paper: Colin Percival,
+  [Stronger Key Derivation via Sequential Memory-Hard Functions](
+  https://www.tarsnap.com/scrypt/scrypt.pdf), presented at
+  [BSDCan'09](https://www.bsdcan.org/2009/), May 2009.
+  [Conference presentation slides](
+  https://www.tarsnap.com/scrypt/scrypt-slides.pdf).
 
-v1.19: Code safety cleanups. Now running Coverity.
+Some additional articles may be of interest:
 
-v1.20: Bigfixes involving large N values, return values on error
+* Filippo Valsorda presented a very well-written explanation about how
+  [the scrypt parameters](https://blog.filippo.io/the-scrypt-parameters/)
+  impact the memory usage and CPU time of the algorithm.
 
-<a href="https://scan.coverity.com/projects/2173">
-  <img alt="Coverity Scan Build Status"
-         src="https://scan.coverity.com/projects/2173/badge.svg"/>
- </a>
+* J. Alwen, B. Chen, K. Pietrzak, L. Reyzin, S. Tessaro,
+  [Scrypt is Maximally Memory-Hard](https://eprint.iacr.org/2016/989),
+  Cryptology ePrint Archive: Report 2016/989.
+
+
+# The scrypt encryption utility
+
+A simple password-based encryption utility is available as a demonstration of
+the `scrypt` key derivation function.  It can be invoked as `scrypt enc infile
+[outfile]` to encrypt data (if `outfile` is not specified, the encrypted data
+is written to the standard output), or as `scrypt dec infile [outfile]` to
+decrypt data (if outfile is not specified, the decrypted data is written to the
+standard output). `scrypt` also supports three command-line options:
+
+* `-t maxtime` will instruct `scrypt` to spend at most maxtime seconds
+  computing the derived encryption key from the password; for encryption, this
+  value will determine how secure the encrypted data is, while for decryption
+  this value is used as an upper limit (if `scrypt` detects that it would take
+  too long to decrypt the data, it will exit with an error message).
+* `-m maxmemfrac` instructs `scrypt` to use at most the specified fraction of
+  the available RAM for computing the derived encryption key. For encryption,
+  increasing this value might increase the security of the encrypted data,
+  depending on the `maxtime` value; for decryption, this value is used as an
+  upper limit and may `cause` scrypt to exit with an error.
+* `-M maxmem` instructs `scrypt` to use at most the specified number of bytes
+  of RAM when computing the derived encryption key.
+
+If the encrypted data is corrupt, `scrypt dec` will exit with a non-zero
+status.  However, **`scrypt dec` may produce output before it determines that
+the encrypted data was corrupt**, so for applications which require data to be
+authenticated, you must store the output of `scrypt dec` in a temporary
+location and check `scrypt`'s exit code before using the decrypted data.
+
+The `scrypt` utility has been tested on FreeBSD, NetBSD, OpenBSD, Linux
+(Slackware, CentOS, Gentoo, Ubuntu), Solaris, OS X, Cygwin, and GNU Hurd.
+
+* [scrypt version 1.2.1 source tarball](
+  https://www.tarsnap.com/scrypt/scrypt-1.2.1.tgz)
+* [GPG-signed SHA256 for scrypt version 1.2.1](
+  https://www.tarsnap.com/scrypt/scrypt-sigs-1.2.1.asc) (signature
+  generated using Tarsnap [code signing key](
+  https://www.tarsnap.com/tarsnap-signing-key.asc))
+
+  This cleartext signature of the SHA256 output can be verified with:
+
+      gpg --decrypt scrypt-sigs-1.2.1.asc
+
+  You may then compare the displayed hash to the SHA256 hash of
+  `scrypt-1.2.1.gz`.
+
+In addition, `scrypt` is available in the OpenBSD and FreeBSD ports trees and
+in NetBSD pkgsrc as `security/scrypt`.
+
+
+# Using scrypt as a KDF
+
+To use scrypt as a [key derivation function](
+https://en.wikipedia.org/wiki/Key_derivation_function) (KDF), take a look at
+the `lib/crypto/crypto_scrypt.h` header, which provides:
+
+```
+/**
+ * crypto_scrypt(passwd, passwdlen, salt, saltlen, N, r, p, buf, buflen):
+ * Compute scrypt(passwd[0 .. passwdlen - 1], salt[0 .. saltlen - 1], N, r,
+ * p, buflen) and write the result into buf.  The parameters r, p, and buflen
+ * must satisfy r * p < 2^30 and buflen <= (2^32 - 1) * 32.  The parameter N
+ * must be a power of 2 greater than 1.
+ *
+ * Return 0 on success; or -1 on error.
+ */
+int crypto_scrypt(const uint8_t *, size_t, const uint8_t *, size_t, uint64_t,
+    uint32_t, uint32_t, uint8_t *, size_t);
+```
+
+
+### Building
+
+:exclamation: We strongly recommend that people use the latest
+official release tarball on https://www.tarsnap.com/scrypt.html
+
+To build scrypt, extract the tarball and run `./configure` && `make`.  See the
+`BUILDING` file for more details (e.g., dealing with OpenSSL on OSX).
+
+
+### Testing
+
+A small test suite can be run with:
+
+    make test
+
+Memory-testing normal operations with valgrind (takes approximately 4 times as
+long as no valgrind tests) can be enabled with:
+
+    make test USE_VALGRIND=1
+
+Memory-testing all tests with valgrind (requires over 1 GB memory, and takes
+approximately 4 times as long as `USE_VALGRIND=1`) can be enabled with:
+
+    make test USE_VALGRIND=2
+
+
+### Mailing list
+
+The scrypt key derivation function and the scrypt encryption utility are
+discussed on the <scrypt@tarsnap.com> mailing list.
+

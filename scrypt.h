@@ -3,6 +3,13 @@
 #ifndef _CRYPTO_SCRYPT_H_
 #define _CRYPTO_SCRYPT_H_
 
+#ifdef SCRYPTDLL_EXPORTS
+#define SCRYPT_API __declspec(dllexport) __cdecl
+#elif SCRYPTDLL_IMPORTS
+#define SCRYPT_API __declspec(dllimport) __cdecl
+#else
+#define SCRYPT_API
+#endif
 
 #include <stdint.h>
 #include <stddef.h>
@@ -26,26 +33,24 @@ extern "C"{
  * standard unless you want to modify the CPU/RAM ratio.
  * Return 0 on success; or -1 on error.
  */
-int libscrypt_scrypt(const uint8_t *, size_t, const uint8_t *, size_t, uint64_t,
+int SCRYPT_API libscrypt_scrypt(const uint8_t *, size_t, const uint8_t *, size_t, uint64_t,
     uint32_t, uint32_t, /*@out@*/ uint8_t *, size_t);
 
 /* Converts a series of input parameters to a MCF form for storage */
-int libscrypt_mcf(uint32_t N, uint32_t r, uint32_t p, const char *salt,
+int SCRYPT_API libscrypt_mcf(uint32_t N, uint32_t r, uint32_t p, const char *salt,
 	const char *hash, char *mcf);
 
-#ifndef _MSC_VER
 /* Generates a salt. Uses /dev/urandom/
  */
-int libscrypt_salt_gen(/*@out@*/ uint8_t *rand, size_t len);
+int SCRYPT_API libscrypt_salt_gen(/*@out@*/ uint8_t *rand, size_t len);
 
 /* Creates a hash of a passphrase using a randomly generated salt */
 /* Returns >0 on success, or 0 for fail */
-int libscrypt_hash(char *dst, const char* passphrase, uint32_t N, uint8_t r,
+int SCRYPT_API libscrypt_hash(char *dst, const char* passphrase, uint32_t N, uint8_t r,
   uint8_t p);
-#endif
 
 /* Checks a given MCF against a password */
-int libscrypt_check(char *mcf, const char *password);
+int SCRYPT_API libscrypt_check(char *mcf, const char *password);
 
 #ifdef __cplusplus
 }

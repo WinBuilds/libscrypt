@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include "libscrypt.h"
+#include "scrypt.h"
 
 /* ilog2 for powers of two */
 static uint32_t scrypt_ilog2(uint32_t n)
