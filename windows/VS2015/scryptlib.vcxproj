@@ -114,6 +114,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;_FORTIFY_SOURCE=2;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <DisableSpecificWarnings>4996;4244</DisableSpecificWarnings>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -121,8 +122,8 @@
     </Link>
     <PostBuildEvent>
       <Message>copying import header files..</Message>
-      <Command>mkdir "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scryptlib\"
-copy "$(SolutionDir)..\..\scrypt.h" "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scryptlib\"</Command>
+      <Command>mkdir "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scrypt\"
+copy "$(SolutionDir)..\..\scrypt.h" "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scrypt\"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -134,6 +135,7 @@ copy "$(SolutionDir)..\..\scrypt.h" "$(SolutionDir)..\..\..\..\build_msvc14_$(Pl
       <PreprocessorDefinitions>_DEBUG;_LIB;_FORTIFY_SOURCE=2;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <DisableSpecificWarnings>4996;4244</DisableSpecificWarnings>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -141,8 +143,8 @@ copy "$(SolutionDir)..\..\scrypt.h" "$(SolutionDir)..\..\..\..\build_msvc14_$(Pl
     </Link>
     <PostBuildEvent>
       <Message>copying import header files..</Message>
-      <Command>mkdir "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scryptlib\"
-copy "$(SolutionDir)..\..\scrypt.h" "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scryptlib\"</Command>
+      <Command>mkdir "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scrypt\"
+copy "$(SolutionDir)..\..\scrypt.h" "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scrypt\"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -165,8 +167,8 @@ copy "$(SolutionDir)..\..\scrypt.h" "$(SolutionDir)..\..\..\..\build_msvc14_$(Pl
     </Link>
     <PostBuildEvent>
       <Message>copying import header files..</Message>
-      <Command>mkdir "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scryptlib\"
-copy "$(SolutionDir)..\..\scrypt.h" "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scryptlib\"</Command>
+      <Command>mkdir "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scrypt\"
+copy "$(SolutionDir)..\..\scrypt.h" "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scrypt\"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -189,8 +191,8 @@ copy "$(SolutionDir)..\..\scrypt.h" "$(SolutionDir)..\..\..\..\build_msvc14_$(Pl
     </Link>
     <PostBuildEvent>
       <Message>copying import header files..</Message>
-      <Command>mkdir "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scryptlib\"
-copy "$(SolutionDir)..\..\scrypt.h" "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scryptlib\"</Command>
+      <Command>mkdir "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scrypt\"
+copy "$(SolutionDir)..\..\scrypt.h" "$(SolutionDir)..\..\..\..\build_msvc14_$(Platform)\$(Configuration)\include\scrypt\"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
