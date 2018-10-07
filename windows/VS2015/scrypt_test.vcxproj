@@ -31,6 +31,7 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>scrypt_test</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <ProjectRoot>$(WINBUILDS_ROOT)</ProjectRoot>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -79,23 +80,23 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IntDir>$(SolutionDir)../../../../build_msvc14_$(Platform)/$(Configuration)/obj/$(ProjectName)/</IntDir>
-    <OutDir>$(SolutionDir)../../../../build_msvc14_$(Platform)/$(Configuration)/bin/</OutDir>
+    <IntDir>$(WINBUILDS_ROOT)build_msvc14_$(Platform)/$(Configuration)/obj/$(ProjectName)/</IntDir>
+    <OutDir>$(WINBUILDS_ROOT)build_msvc14_$(Platform)/$(Configuration)/bin/</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IntDir>$(SolutionDir)../../../../build_msvc14_$(Platform)/$(Configuration)/obj/$(ProjectName)/</IntDir>
-    <OutDir>$(SolutionDir)../../../../build_msvc14_$(Platform)/$(Configuration)/bin/</OutDir>
+    <IntDir>$(WINBUILDS_ROOT)build_msvc14_$(Platform)/$(Configuration)/obj/$(ProjectName)/</IntDir>
+    <OutDir>$(WINBUILDS_ROOT)build_msvc14_$(Platform)/$(Configuration)/bin/</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IntDir>$(SolutionDir)../../../../build_msvc14_$(Platform)/$(Configuration)/obj/$(ProjectName)/</IntDir>
-    <OutDir>$(SolutionDir)../../../../build_msvc14_$(Platform)/$(Configuration)/bin/</OutDir>
+    <IntDir>$(WINBUILDS_ROOT)build_msvc14_$(Platform)/$(Configuration)/obj/$(ProjectName)/</IntDir>
+    <OutDir>$(WINBUILDS_ROOT)build_msvc14_$(Platform)/$(Configuration)/bin/</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IntDir>$(SolutionDir)../../../../build_msvc14_$(Platform)/$(Configuration)/obj/$(ProjectName)/</IntDir>
-    <OutDir>$(SolutionDir)../../../../build_msvc14_$(Platform)/$(Configuration)/bin/</OutDir>
+    <IntDir>$(WINBUILDS_ROOT)build_msvc14_$(Platform)/$(Configuration)/obj/$(ProjectName)/</IntDir>
+    <OutDir>$(WINBUILDS_ROOT)build_msvc14_$(Platform)/$(Configuration)/bin/</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
