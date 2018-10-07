@@ -5,3 +5,10 @@
 reference
 endian.h
 byteorder
+build_*/
+build-*/
+*.lnk
+*.url
+.vs
+*.VC.db
+*.VC.opendb

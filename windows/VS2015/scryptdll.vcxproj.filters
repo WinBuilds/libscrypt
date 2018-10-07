@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\..\b64.c" />
+    <ClCompile Include="..\..\crypto_scrypt-check.c" />
+    <ClCompile Include="..\..\crypto_scrypt-hash.c" />
+    <ClCompile Include="..\..\crypto_scrypt-hexconvert.c" />
+    <ClCompile Include="..\..\crypto_scrypt-nosse.c" />
+    <ClCompile Include="..\..\crypto-mcf.c" />
+    <ClCompile Include="..\..\crypto-scrypt-saltgen.c" />
+    <ClCompile Include="..\..\sha256.c" />
+    <ClCompile Include="..\..\slowequals.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\b64.h" />
+    <ClInclude Include="..\..\crypto_scrypt-hexconvert.h" />
+    <ClInclude Include="..\..\libscrypt.h" />
+    <ClInclude Include="..\..\sha256.h" />
+    <ClInclude Include="..\..\slowequals.h" />
+    <ClInclude Include="..\..\sysendian.h" />
+  </ItemGroup>
+</Project>
