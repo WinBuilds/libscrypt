@@ -1,0 +1,1139 @@
+diff --git a/.gitignore b/.gitignore
+index 516de95..e876b6c 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -5,12 +5,10 @@
+ reference
+ endian.h
+ byteorder
+-
++build_*/
++build-*/
+ *.lnk
+-/build-*/
+-/build_*/
+-.vs/
+-ipch/
+-*.aps
++*.url
++.vs
+ *.VC.db
+ *.VC.opendb
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+deleted file mode 100644
+index ebfa1f3..0000000
+--- a/CMakeLists.txt
++++ /dev/null
+@@ -1,54 +0,0 @@
+-cmake_minimum_required(VERSION 3.0)
+-project(libscrypt LANGUAGES C)
+-
+-set(
+-    sources
+-    b64.c b64.h
+-    crypto_scrypt-check.c
+-    crypto_scrypt-hash.c
+-    crypto_scrypt-hexconvert.c crypto_scrypt-hexconvert.h
+-    crypto_scrypt-nosse.c
+-    crypto-mcf.c
+-    crypto-scrypt-saltgen.c
+-    libscrypt.h
+-    main.c
+-    sha256.c sha256.h
+-    slowequals.c slowequals.h
+-    sysendian.h
+-)
+-
+-add_library(scrypt ${sources})
+-target_compile_definitions(scrypt PRIVATE _FORTIFY_SOURCE=2)
+-set_target_properties(
+-    scrypt PROPERTIES
+-    PUBLIC_HEADER libscrypt.h
+-    SOVERSION 0
+-)
+-
+-include(GNUInstallDirs)
+-install(
+-    TARGETS scrypt
+-    EXPORT libscryptTargets
+-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+-    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+-    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+-)
+-
+-include(CMakePackageConfigHelpers)
+-set(config_install_destination ${CMAKE_INSTALL_LIBDIR}/libscrypt/cmake)
+-configure_package_config_file(
+-    libscryptConfig.cmake.in libscryptConfig.cmake
+-    INSTALL_DESTINATION ${config_install_destination}
+-)
+-install(
+-    EXPORT libscryptTargets
+-    DESTINATION ${config_install_destination}
+-    NAMESPACE libscrypt::
+-)
+-install(
+-    FILES
+-    ${CMAKE_CURRENT_BINARY_DIR}/libscryptConfig.cmake
+-    DESTINATION ${config_install_destination}
+-)
+diff --git a/Makefile b/Makefile
+index 783c537..7022a4a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -5,28 +5,27 @@ MAKE_DIR     ?= install -d
+ INSTALL_DATA ?= install
+ 
+ CC?=gcc
+-CFLAGS?=$(CFLAGS_EXTRA) -D_FORTIFY_SOURCE=2 -fPIC
+-LDFLAGS?=$(LDFLAGS_EXTRA) -Wl,-soname,libscrypt.so.0 -Wl,--version-script=libscrypt.version
+-CFLAGS_EXTRA?=-Wl,-rpath=. -O2 -Wall -g -fstack-protector
+-LDFLAGS_EXTRA?=-Wl,-z,relro
++CFLAGS?=-O2 -Wall -g -D_FORTIFY_SOURCE=2 -fstack-protector -fPIC
++LDFLAGS?=-Wl,-z,now -Wl,-z,relro -Wl,-soname,libscrypt.so.0 -Wl,--version-script=libscrypt.version
++CFLAGS_EXTRA?=-Wl,-rpath=.
+ 
+ all: reference
+ 
+ OBJS= crypto_scrypt-nosse.o sha256.o crypto-mcf.o b64.o crypto-scrypt-saltgen.o crypto_scrypt-check.o crypto_scrypt-hash.o slowequals.o
+ 
+ libscrypt.so.0: $(OBJS) 
+-	$(CC) $(LDFLAGS) -shared -o libscrypt.so.0  $(OBJS) -lm -lc
++	$(CC)  $(LDFLAGS) -shared -o libscrypt.so.0  $(OBJS) -lm -lc
+ 	ar rcs libscrypt.a  $(OBJS)
+ 
+ reference: libscrypt.so.0 main.o crypto_scrypt-hexconvert.o
+ 	ln -s -f libscrypt.so.0 libscrypt.so
+-	$(CC) -o reference main.o b64.o crypto_scrypt-hexconvert.o $(CFLAGS) $(LDFLAGS_EXTRA) -L.  -lscrypt
++	$(CC) -Wall -o reference main.o b64.o crypto_scrypt-hexconvert.o $(CFLAGS_EXTRA) -L.  -lscrypt
+ 
+ clean:
+ 	rm -f *.o reference libscrypt.so* libscrypt.a endian.h
+ 
+ check: all
+-	LD_LIBRARY_PATH=. ./reference
++	./reference
+ 
+ devtest:
+ 	splint crypto_scrypt-hexconvert.c 
+diff --git a/README.md b/README.md
+index 378e63c..af70122 100644
+--- a/README.md
++++ b/README.md
+@@ -1,35 +1,34 @@
+-# The scrypt hashing library
++libscrypt
++=========
++Linux scrypt shared library.
+ 
+-* This is a fork of Colin Percival's scrypt hashing library. The original repository
+-is found here:
+-[http://www.tarsnap.com/scrypt.html](http://www.tarsnap.com/scrypt.html)
++Full credit to algorithm designer and example code from Colin Percival here:
++http://www.tarsnap.com/scrypt.html
+ 
+-* Utilises BASE64 encoding library from ISC.
++Utilises BASE64 encoding library from ISC.
+ 
+-* Official project page, including stable tarballs are found here:<br>
+-[http://www.lolware.net/libscrypt.html](http://www.lolware.net/libscrypt.html)
++Official project page, including stable tarballs found here:
++http://www.lolware.net/libscrypt.html
+ 
+-### Simple hashing interface
++Simple hashing interface
+ 
+-The reference hashing function can be directly called as follows:
++The (reference) internal hashing function can be directly called as follows:
+ 
+     int libscrypt_scrypt(const uint8_t *passwd, size_t passwdlen,
+-       const uint8_t *salt, size_t saltlen, uint64_t N, uint32_t r, 
+-       uint32_t p, /*@out@*/ uint8_t *buf, size_t buflen);
++            const uint8_t *salt, size_t saltlen, uint64_t N, uint32_t r, 
++            uint32_t p, /*@out@*/ uint8_t *buf, size_t buflen);
+ 
+-scryptlib's easier to use interface wraps this up to deal with the salt and produce BASE64 output as so:
++Libscrypt's easier to use interface wraps this up to deal with the salt and produce BASE64 output as so:
+ 
+-    int libscrypt_hash(char *dst, char *passphrase, 
+-       uint32_t N, uint8_t r, uint8_t p);
++    int libscrypt_hash(char *dst, char *passphrase, uint32_t N, uint8_t r, uint8_t p);
+ 
+ Sane constants have been created for N, r and p so you can create a hash like this:
+ 
+-    libscrypt_hash(outbuf, "My cats's breath smells like cat food", 
+-       SCRYPT_N, SCRYPT_r, SCRYPT_p);
++    libscrypt_hash(outbuf, "My cats's breath smells like cat food", SCRYPT_N, SCRYPT_r, SCRYPT_p);
+ 
+-This function sets `errno` as required for any error conditions.
++This function sets errno as required for any error conditions.
+ 
+-Output stored in `outbuf` is stored in a standardised MCF form, which means includes the randomly created, 128 bit salt, all N, r and p values, and a BASE64 encoded version of the hash. The entire MCF can be stored in a database, and compared for use as below:
++Output stored in "outbuf" is stored in a standardised MCF form, which means includes the randomly created, 128 bit salt, all N, r and p values, and a BASE64 encoded version of the hash. The entire MCF can be stored in a database, and compared for use as below:
+ 
+     retval = libscrypt_check(mcf, "pleasefailme");
+     retval < 0 error
+@@ -41,170 +40,68 @@ mcf should be defined as at least SCRYPT_MCF_LEN in size.
+ Note that libscrypt_check needs to modify the mcf string and will not return it
+ to the original state. Pass it a copy if you need to keep the original mcf.
+ 
+-A number of internal functions are exposed, and users wishing to create more complex use cases should consult the header file, which documents the API.
+-
+-The test code provides a well documented use case.
+-
+-# Building
++A number of internal functions are exposed, and users wishing to create more complex use cases should consult the header file, which is aimed at documenting the API fully.
+ 
++The test reference is also aimed at providing a well documented use case.
++Building
++--------
+     make
+     make check
+-
+ Check the Makefile for advice on linking against your application.
+ 
+-### Building on OSX
++OSX
++-----
+ Please compile and install with:
+ 
+     make LDFLAGS= CFLAGS_EXTRA=
+     make install-osx
+ 
+-# BUGS
+-
+-* SCRYPT_* constants are too high for Raspberry pi. Using '1' as SCRYPT_p is acceptable from a security and performance standpoint. 
+-
+-* Using `memset()` to zero out passwords may cause issues with calling applications that pass the password in as a `const*`. 
+-
+-
+-# The scrypt key derivation function
+-
+-The scrypt key derivation function was originally developed for use in the
+-[Tarsnap online backup system](https://www.tarsnap.com/index.html) and is
+-designed to be far more secure against hardware brute-force attacks than
+-alternative functions such as [PBKDF2](https://en.wikipedia.org/wiki/PBKDF2) or
+-[bcrypt](https://www.openbsd.org/papers/bcrypt-paper.ps).
+-
+-We estimate that on modern (2009) hardware, if 5 seconds are spent computing a
+-derived key, the cost of a hardware brute-force attack against `scrypt` is
+-roughly 4000 times greater than the cost of a similar attack against bcrypt (to
+-find the same password), and 20000 times greater than a similar attack against
+-PBKDF2.  If the `scrypt` encryption utility is used with default parameters,
+-the cost of cracking the password on a file encrypted by `scrypt enc` is
+-approximately 100 billion times more than the cost of cracking the same
+-password on a file encrypted by `openssl enc`; this means that a five-character
+-password using `scrypt` is stronger than a ten-character password using
+-`openssl`.
+-
+-Details of the `scrypt` key derivation function are given in:
+-
+-* The Internet Engineering Task Force (IETF)
+-  [RFC 7914: The scrypt Password-Based Key Derivation Function](
+-  https://tools.ietf.org/html/rfc7914).
+-* The original conference paper: Colin Percival,
+-  [Stronger Key Derivation via Sequential Memory-Hard Functions](
+-  https://www.tarsnap.com/scrypt/scrypt.pdf), presented at
+-  [BSDCan'09](https://www.bsdcan.org/2009/), May 2009.
+-  [Conference presentation slides](
+-  https://www.tarsnap.com/scrypt/scrypt-slides.pdf).
+-
+-Some additional articles may be of interest:
+-
+-* Filippo Valsorda presented a very well-written explanation about how
+-  [the scrypt parameters](https://blog.filippo.io/the-scrypt-parameters/)
+-  impact the memory usage and CPU time of the algorithm.
+-
+-* J. Alwen, B. Chen, K. Pietrzak, L. Reyzin, S. Tessaro,
+-  [Scrypt is Maximally Memory-Hard](https://eprint.iacr.org/2016/989),
+-  Cryptology ePrint Archive: Report 2016/989.
+-
+-
+-# The scrypt encryption utility
+-
+-A simple password-based encryption utility is available as a demonstration of
+-the `scrypt` key derivation function.  It can be invoked as `scrypt enc infile
+-[outfile]` to encrypt data (if `outfile` is not specified, the encrypted data
+-is written to the standard output), or as `scrypt dec infile [outfile]` to
+-decrypt data (if outfile is not specified, the decrypted data is written to the
+-standard output). `scrypt` also supports three command-line options:
+-
+-* `-t maxtime` will instruct `scrypt` to spend at most maxtime seconds
+-  computing the derived encryption key from the password; for encryption, this
+-  value will determine how secure the encrypted data is, while for decryption
+-  this value is used as an upper limit (if `scrypt` detects that it would take
+-  too long to decrypt the data, it will exit with an error message).
+-* `-m maxmemfrac` instructs `scrypt` to use at most the specified fraction of
+-  the available RAM for computing the derived encryption key. For encryption,
+-  increasing this value might increase the security of the encrypted data,
+-  depending on the `maxtime` value; for decryption, this value is used as an
+-  upper limit and may `cause` scrypt to exit with an error.
+-* `-M maxmem` instructs `scrypt` to use at most the specified number of bytes
+-  of RAM when computing the derived encryption key.
+-
+-If the encrypted data is corrupt, `scrypt dec` will exit with a non-zero
+-status.  However, **`scrypt dec` may produce output before it determines that
+-the encrypted data was corrupt**, so for applications which require data to be
+-authenticated, you must store the output of `scrypt dec` in a temporary
+-location and check `scrypt`'s exit code before using the decrypted data.
+-
+-The `scrypt` utility has been tested on FreeBSD, NetBSD, OpenBSD, Linux
+-(Slackware, CentOS, Gentoo, Ubuntu), Solaris, OS X, Cygwin, and GNU Hurd.
+-
+-* [scrypt version 1.2.1 source tarball](
+-  https://www.tarsnap.com/scrypt/scrypt-1.2.1.tgz)
+-* [GPG-signed SHA256 for scrypt version 1.2.1](
+-  https://www.tarsnap.com/scrypt/scrypt-sigs-1.2.1.asc) (signature
+-  generated using Tarsnap [code signing key](
+-  https://www.tarsnap.com/tarsnap-signing-key.asc))
+-
+-  This cleartext signature of the SHA256 output can be verified with:
+-
+-      gpg --decrypt scrypt-sigs-1.2.1.asc
+-
+-  You may then compare the displayed hash to the SHA256 hash of
+-  `scrypt-1.2.1.gz`.
+-
+-In addition, `scrypt` is available in the OpenBSD and FreeBSD ports trees and
+-in NetBSD pkgsrc as `security/scrypt`.
+-
+-
+-# Using scrypt as a KDF
+ 
+-To use scrypt as a [key derivation function](
+-https://en.wikipedia.org/wiki/Key_derivation_function) (KDF), take a look at
+-the `lib/crypto/crypto_scrypt.h` header, which provides:
++BUGS
++----
++SCRYPT_* constants are probably a little high for something like a Raspberry pi. Using '1' as SCRYPT_p is acceptable from a security and performance standpoint if needed. 
++Experiments were performed with using memset() to zero out passwords as they were checked. This often caused issues with calling applications where the password based have been passed as a const*. We highly recommend implementing your own zeroing function the moment this library is called.
+ 
+-```
+-/**
+- * crypto_scrypt(passwd, passwdlen, salt, saltlen, N, r, p, buf, buflen):
+- * Compute scrypt(passwd[0 .. passwdlen - 1], salt[0 .. saltlen - 1], N, r,
+- * p, buflen) and write the result into buf.  The parameters r, p, and buflen
+- * must satisfy r * p < 2^30 and buflen <= (2^32 - 1) * 32.  The parameter N
+- * must be a power of 2 greater than 1.
+- *
+- * Return 0 on success; or -1 on error.
+- */
+-int crypto_scrypt(const uint8_t *, size_t, const uint8_t *, size_t, uint64_t,
+-    uint32_t, uint32_t, uint8_t *, size_t);
+-```
++Notes on Code Development
++------------------------
+ 
++Code is now declared "stable", the master branch will always be "stable" and development will be done on branches.
++The reference machines are Fedora, CentOS, FreeBSD and Raspbian, and the code is expected to compile and run on all of these before being moved to stable branch.
++Full transparancy on the regular application of thorough testing can be found by reviewing recent test harness results here:
++http://www.lolware.net/libscrypttesting.txt
+ 
+-### Building
++Please, no more pull requests for Windows compatibility. If it's important to you - fork the project. I have no intention of pulling an OpenSSL and becoming a maze of ifdefs for platforms I don't even have a build environment for.
+ 
+-:exclamation: We strongly recommend that people use the latest
+-official release tarball on https://www.tarsnap.com/scrypt.html
++I utilise Facebook's "infer" static analyser, in addition to clang's analyzer. Command to run is:
+ 
+-To build scrypt, extract the tarball and run `./configure` && `make`.  See the
+-`BUILDING` file for more details (e.g., dealing with OpenSSL on OSX).
++    infer -- make
+ 
++Contact
++-------
++I can be contacted at: technion@lolware.net
+ 
+-### Testing
++If required, my GPG key can be found at: https://lolware.net/technion-GPG-KEY
+ 
+-A small test suite can be run with:
++Future releases will have the Git tag signed.
+ 
+-    make test
+ 
+-Memory-testing normal operations with valgrind (takes approximately 4 times as
+-long as no valgrind tests) can be enabled with:
++Changenotes
++-----------
++v1.1a: Single Makefile line change. I wouldn't ordinarily tag this as a new "release", but the purpose here is to assist with packaging in distributions.
+ 
+-    make test USE_VALGRIND=1
++v1.12: The static library is built, but no longer installed by default. You can install it with "make install-static". This is because static libraries are not typically bundled in packages.
+ 
+-Memory-testing all tests with valgrind (requires over 1 GB memory, and takes
+-approximately 4 times as long as `USE_VALGRIND=1`) can be enabled with:
++v1.13: Minor packaging related update
+ 
+-    make test USE_VALGRIND=2
++v1.15: Replaced the b64 libraries with more portable one from ISC. Now tested and verified on a wider variety of architectures. Note, libscrypt_b64_encrypt was originally an exported function. This is no longer the case as it is considered an internal function only.
+ 
++v1.18: God damnit Apple
+ 
+-### Mailing list
++v1.19: Code safety cleanups. Now running Coverity.
+ 
+-The scrypt key derivation function and the scrypt encryption utility are
+-discussed on the <scrypt@tarsnap.com> mailing list.
++v1.20: Bigfixes involving large N values, return values on error
+ 
++<a href="https://scan.coverity.com/projects/2173">
++  <img alt="Coverity Scan Build Status"
++         src="https://scan.coverity.com/projects/2173/badge.svg"/>
++ </a>
+diff --git a/crypto-mcf.c b/crypto-mcf.c
+index c4d0d78..789aead 100644
+--- a/crypto-mcf.c
++++ b/crypto-mcf.c
+@@ -1,8 +1,16 @@
+ #include <stdlib.h>
++#include <string.h>
+ #include <stdio.h>
+ #include <stdint.h>
++#include <float.h>
++#include <stdint.h>
++#include <math.h>
++
++#ifndef S_SPLINT_S /* Including this here triggers a known bug in splint */
++#include <unistd.h>
++#endif
+ 
+-#include "scrypt.h"
++#include "libscrypt.h"
+ 
+ /* ilog2 for powers of two */
+ static uint32_t scrypt_ilog2(uint32_t n)
+@@ -62,4 +70,4 @@ int libscrypt_mcf(uint32_t N, uint32_t r, uint32_t p, const char *salt,
+ 		return 0;
+ 
+ 	return 1;
+-}
++}	
+diff --git a/crypto-scrypt-saltgen.c b/crypto-scrypt-saltgen.c
+index b915827..a0e2998 100644
+--- a/crypto-scrypt-saltgen.c
++++ b/crypto-scrypt-saltgen.c
+@@ -1,34 +1,9 @@
+-#define _CRT_RAND_S  
+ #include <stdlib.h>
+-
+ #include <string.h>
+ #include <stdint.h>
+ #include <errno.h>
+ #include <fcntl.h>
+ 
+-/* Disable on Windows, there is no /dev/urandom.
+-   Link-time error is better than runtime error. */
+-#ifdef _WIN32
+-
+-int libscrypt_salt_gen(uint8_t *salt, size_t len) {
+-   size_t buflen = 1+len/sizeof(unsigned int);
+-   unsigned int number, *buf = malloc(buflen);   
+-   int rc = 0;
+-   for (size_t data_read = 0; data_read < buflen; data_read++) {      
+-      if (rc = rand_s(&number))
+-         break;
+-      buf[data_read] = number;
+-   }
+-   
+-   if (!rc)
+-      memcpy(salt, buf, len);
+-
+-   free(buf);
+-   return rc ? -1 : 0;
+-}
+-
+-#else
+-
+ #ifndef S_SPLINT_S /* Including this here triggers a known bug in splint */
+ #include <unistd.h>
+ #endif
+@@ -71,5 +46,3 @@ int libscrypt_salt_gen(uint8_t *salt, size_t len)
+ 
+ 	return 0;
+ }
+-
+-#endif
+diff --git a/crypto_scrypt-check.c b/crypto_scrypt-check.c
+index b54a281..8ea4519 100644
+--- a/crypto_scrypt-check.c
++++ b/crypto_scrypt-check.c
+@@ -5,7 +5,7 @@
+ 
+ #include "b64.h"
+ #include "slowequals.h"
+-#include "scrypt.h"
++#include "libscrypt.h"
+ 
+ #ifdef _WIN32
+ /* On windows, strtok uses a thread-local static variable in strtok to
+diff --git a/crypto_scrypt-hash.c b/crypto_scrypt-hash.c
+index 7a65d2c..4b41007 100644
+--- a/crypto_scrypt-hash.c
++++ b/crypto_scrypt-hash.c
+@@ -4,7 +4,7 @@
+ #include <stdint.h>
+ 
+ #include "b64.h"
+-#include "scrypt.h"
++#include "libscrypt.h"
+ 
+ int libscrypt_hash(char *dst, const char *passphrase, uint32_t N, uint8_t r,
+ 		uint8_t p)
+diff --git a/crypto_scrypt-nosse.c b/crypto_scrypt-nosse.c
+index 7c47c78..12c860f 100644
+--- a/crypto_scrypt-nosse.c
++++ b/crypto_scrypt-nosse.c
+@@ -39,7 +39,7 @@
+ #include "sha256.h"
+ #include "sysendian.h"
+ 
+-#include "scrypt.h"
++#include "libscrypt.h"
+ 
+ static void blkcpy(void *, void *, size_t);
+ static void blkxor(void *, void *, size_t);
+diff --git a/crypto_scrypt-ref.c b/crypto_scrypt-ref.c
+deleted file mode 100644
+index cd4805c..0000000
+--- a/crypto_scrypt-ref.c
++++ /dev/null
+@@ -1,286 +0,0 @@
+-/*-
+- * Copyright 2009 Colin Percival
+- * All rights reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in the
+- *    documentation and/or other materials provided with the distribution.
+- *
+- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+- * SUCH DAMAGE.
+- *
+- * This file was originally written by Colin Percival as part of the Tarsnap
+- * online backup system.
+- */
+-//#include "scrypt_platform.h"
+-
+-#include <errno.h>
+-#include <stdint.h>
+-#include <stdlib.h>
+-#include <string.h>
+-
+-#include "sha256.h"
+-#include "sysendian.h"
+-
+-//#include "crypto_scrypt.h"
+-#include "scrypt.h"
+-
+-static void blkcpy(uint8_t *, uint8_t *, size_t);
+-static void blkxor(uint8_t *, uint8_t *, size_t);
+-static void salsa20_8(uint8_t[64]);
+-static void blockmix_salsa8(uint8_t *, uint8_t *, size_t);
+-static uint64_t integerify(uint8_t *, size_t);
+-static void smix(uint8_t *, size_t, uint64_t, uint8_t *, uint8_t *);
+-
+-static void
+-blkcpy(uint8_t * dest, uint8_t * src, size_t len)
+-{
+-	size_t i;
+-
+-	for (i = 0; i < len; i++)
+-		dest[i] = src[i];
+-}
+-
+-static void
+-blkxor(uint8_t * dest, uint8_t * src, size_t len)
+-{
+-	size_t i;
+-
+-	for (i = 0; i < len; i++)
+-		dest[i] ^= src[i];
+-}
+-
+-/**
+- * salsa20_8(B):
+- * Apply the salsa20/8 core to the provided block.
+- */
+-static void
+-salsa20_8(uint8_t B[64])
+-{
+-	uint32_t B32[16];
+-	volatile uint32_t x[16];
+-	size_t i;
+-
+-	/* Convert little-endian values in. */
+-	for (i = 0; i < 16; i++)
+-		B32[i] = le32dec(&B[i * 4]);
+-
+-	/* Compute x = doubleround^4(B32). */
+-	for (i = 0; i < 16; i++)
+-		x[i] = B32[i];
+-	for (i = 0; i < 8; i += 2) {
+-#define R(a,b) (((a) << (b)) | ((a) >> (32 - (b))))
+-		/* Operate on columns. */
+-		x[ 4] ^= R(x[ 0]+x[12], 7);  x[ 8] ^= R(x[ 4]+x[ 0], 9);
+-		x[12] ^= R(x[ 8]+x[ 4],13);  x[ 0] ^= R(x[12]+x[ 8],18);
+-
+-		x[ 9] ^= R(x[ 5]+x[ 1], 7);  x[13] ^= R(x[ 9]+x[ 5], 9);
+-		x[ 1] ^= R(x[13]+x[ 9],13);  x[ 5] ^= R(x[ 1]+x[13],18);
+-
+-		x[14] ^= R(x[10]+x[ 6], 7);  x[ 2] ^= R(x[14]+x[10], 9);
+-		x[ 6] ^= R(x[ 2]+x[14],13);  x[10] ^= R(x[ 6]+x[ 2],18);
+-
+-		x[ 3] ^= R(x[15]+x[11], 7);  x[ 7] ^= R(x[ 3]+x[15], 9);
+-		x[11] ^= R(x[ 7]+x[ 3],13);  x[15] ^= R(x[11]+x[ 7],18);
+-
+-		/* Operate on rows. */
+-		x[ 1] ^= R(x[ 0]+x[ 3], 7);  x[ 2] ^= R(x[ 1]+x[ 0], 9);
+-		x[ 3] ^= R(x[ 2]+x[ 1],13);  x[ 0] ^= R(x[ 3]+x[ 2],18);
+-
+-		x[ 6] ^= R(x[ 5]+x[ 4], 7);  x[ 7] ^= R(x[ 6]+x[ 5], 9);
+-		x[ 4] ^= R(x[ 7]+x[ 6],13);  x[ 5] ^= R(x[ 4]+x[ 7],18);
+-
+-		x[11] ^= R(x[10]+x[ 9], 7);  x[ 8] ^= R(x[11]+x[10], 9);
+-		x[ 9] ^= R(x[ 8]+x[11],13);  x[10] ^= R(x[ 9]+x[ 8],18);
+-
+-		x[12] ^= R(x[15]+x[14], 7);  x[13] ^= R(x[12]+x[15], 9);
+-		x[14] ^= R(x[13]+x[12],13);  x[15] ^= R(x[14]+x[13],18);
+-#undef R
+-	}
+-
+-	/* Compute B32 = B32 + x. */
+-	for (i = 0; i < 16; i++)
+-		B32[i] += x[i];
+-
+-	/* Convert little-endian values out. */
+-	for (i = 0; i < 16; i++)
+-		le32enc(&B[4 * i], B32[i]);
+-}
+-
+-/**
+- * blockmix_salsa8(B, Y, r):
+- * Compute B = BlockMix_{salsa20/8, r}(B).  The input B must be 128r bytes in
+- * length; the temporary space Y must also be the same size.
+- */
+-static void
+-blockmix_salsa8(uint8_t * B, uint8_t * Y, size_t r)
+-{
+-	uint8_t X[64];
+-	size_t i;
+-
+-	/* 1: X <-- B_{2r - 1} */
+-	blkcpy(X, &B[(2 * r - 1) * 64], 64);
+-
+-	/* 2: for i = 0 to 2r - 1 do */
+-	for (i = 0; i < 2 * r; i++) {
+-		/* 3: X <-- H(X \xor B_i) */
+-		blkxor(X, &B[i * 64], 64);
+-		salsa20_8(X);
+-
+-		/* 4: Y_i <-- X */
+-		blkcpy(&Y[i * 64], X, 64);
+-	}
+-
+-	/* 6: B' <-- (Y_0, Y_2 ... Y_{2r-2}, Y_1, Y_3 ... Y_{2r-1}) */
+-	for (i = 0; i < r; i++)
+-		blkcpy(&B[i * 64], &Y[(i * 2) * 64], 64);
+-	for (i = 0; i < r; i++)
+-		blkcpy(&B[(i + r) * 64], &Y[(i * 2 + 1) * 64], 64);
+-}
+-
+-/**
+- * integerify(B, r):
+- * Return the result of parsing B_{2r-1} as a little-endian integer.
+- */
+-static uint64_t
+-integerify(uint8_t * B, size_t r)
+-{
+-	uint8_t * X = &B[(2 * r - 1) * 64];
+-
+-	return (le64dec(X));
+-}
+-
+-/**
+- * smix(B, r, N, V, XY):
+- * Compute B = SMix_r(B, N).  The input B must be 128r bytes in length; the
+- * temporary storage V must be 128rN bytes in length; the temporary storage
+- * XY must be 256r bytes in length.  The value N must be a power of 2.
+- */
+-static void
+-smix(uint8_t * B, size_t r, uint64_t N, uint8_t * V, uint8_t * XY)
+-{
+-	uint8_t * X = XY;
+-	uint8_t * Y = &XY[128 * r];
+-	uint64_t i;
+-	uint64_t j;
+-
+-	/* 1: X <-- B */
+-	blkcpy(X, B, 128 * r);
+-
+-	/* 2: for i = 0 to N - 1 do */
+-	for (i = 0; i < N; i++) {
+-		/* 3: V_i <-- X */
+-		blkcpy(&V[i * (128 * r)], X, 128 * r);
+-
+-		/* 4: X <-- H(X) */
+-		blockmix_salsa8(X, Y, r);
+-	}
+-
+-	/* 6: for i = 0 to N - 1 do */
+-	for (i = 0; i < N; i++) {
+-		/* 7: j <-- Integerify(X) mod N */
+-		j = integerify(X, r) & (N - 1);
+-
+-		/* 8: X <-- H(X \xor V_j) */
+-		blkxor(X, &V[j * (128 * r)], 128 * r);
+-		blockmix_salsa8(X, Y, r);
+-	}
+-
+-	/* 10: B' <-- X */
+-	blkcpy(B, X, 128 * r);
+-}
+-
+-/**
+- * crypto_scrypt(passwd, passwdlen, salt, saltlen, N, r, p, buf, buflen):
+- * Compute scrypt(passwd[0 .. passwdlen - 1], salt[0 .. saltlen - 1], N, r,
+- * p, buflen) and write the result into buf.  The parameters r, p, and buflen
+- * must satisfy r * p < 2^30 and buflen <= (2^32 - 1) * 32.  The parameter N
+- * must be a power of 2.
+- *
+- * Return 0 on success; or -1 on error.
+- */
+-int
+-crypto_scrypt(const uint8_t * passwd, size_t passwdlen,
+-    const uint8_t * salt, size_t saltlen, uint64_t N, uint32_t _r, uint32_t _p,
+-    uint8_t * buf, size_t buflen)
+-{
+-	uint8_t * B;
+-	uint8_t * V;
+-	uint8_t * XY;
+-	size_t r = _r, p = _p;
+-	uint32_t i;
+-
+-	/* Sanity-check parameters. */
+-#if SIZE_MAX > UINT32_MAX
+-	if (buflen > (((uint64_t)(1) << 32) - 1) * 32) {
+-		errno = EFBIG;
+-		goto err0;
+-	}
+-#endif
+-	if ((uint64_t)(r) * (uint64_t)(p) >= (1 << 30)) {
+-		errno = EFBIG;
+-		goto err0;
+-	}
+-	if (((N & (N - 1)) != 0) || (N == 0)) {
+-		errno = EINVAL;
+-		goto err0;
+-	}
+-	if ((r > SIZE_MAX / 128 / p) ||
+-#if SIZE_MAX / 256 <= UINT32_MAX
+-	    (r > SIZE_MAX / 256) ||
+-#endif
+-	    (N > SIZE_MAX / 128 / r)) {
+-		errno = ENOMEM;
+-		goto err0;
+-	}
+-
+-	/* Allocate memory. */
+-	if ((B = malloc(128 * r * p)) == NULL)
+-		goto err0;
+-	if ((XY = malloc(256 * r)) == NULL)
+-		goto err1;
+-	if ((V = malloc(128 * r * N)) == NULL)
+-		goto err2;
+-
+-	/* 1: (B_0 ... B_{p-1}) <-- PBKDF2(P, S, 1, p * MFLen) */
+-   libscrypt_PBKDF2_SHA256(passwd, passwdlen, salt, saltlen, 1, B, p * 128 * r);
+-
+-	/* 2: for i = 0 to p - 1 do */
+-	for (i = 0; i < p; i++) {
+-		/* 3: B_i <-- MF(B_i, N) */
+-		smix(&B[i * 128 * r], r, N, V, XY);
+-	}
+-
+-	/* 5: DK <-- PBKDF2(P, B, 1, dkLen) */
+-   libscrypt_PBKDF2_SHA256(passwd, passwdlen, B, p * 128 * r, 1, buf, buflen);
+-
+-	/* Free memory. */
+-	free(V);
+-	free(XY);
+-	free(B);
+-
+-	/* Success! */
+-	return (0);
+-
+-err2:
+-	free(XY);
+-err1:
+-	free(B);
+-err0:
+-	/* Failure! */
+-	return (-1);
+-}
+diff --git a/scrypt.h b/libscrypt.h
+similarity index 77%
+rename from scrypt.h
+rename to libscrypt.h
+index 968fd72..03eaaf8 100644
+--- a/scrypt.h
++++ b/libscrypt.h
+@@ -3,13 +3,6 @@
+ #ifndef _CRYPTO_SCRYPT_H_
+ #define _CRYPTO_SCRYPT_H_
+ 
+-#ifdef SCRYPTDLL_EXPORTS
+-#define SCRYPT_API __declspec(dllexport) __cdecl
+-#elif SCRYPTDLL_IMPORTS
+-#define SCRYPT_API __declspec(dllimport) __cdecl
+-#else
+-#define SCRYPT_API
+-#endif
+ 
+ #include <stdint.h>
+ #include <stddef.h>
+@@ -33,24 +26,26 @@ extern "C"{
+  * standard unless you want to modify the CPU/RAM ratio.
+  * Return 0 on success; or -1 on error.
+  */
+-int SCRYPT_API libscrypt_scrypt(const uint8_t *, size_t, const uint8_t *, size_t, uint64_t,
++int libscrypt_scrypt(const uint8_t *, size_t, const uint8_t *, size_t, uint64_t,
+     uint32_t, uint32_t, /*@out@*/ uint8_t *, size_t);
+ 
+ /* Converts a series of input parameters to a MCF form for storage */
+-int SCRYPT_API libscrypt_mcf(uint32_t N, uint32_t r, uint32_t p, const char *salt,
++int libscrypt_mcf(uint32_t N, uint32_t r, uint32_t p, const char *salt,
+ 	const char *hash, char *mcf);
+ 
++#ifndef _MSC_VER
+ /* Generates a salt. Uses /dev/urandom/
+  */
+-int SCRYPT_API libscrypt_salt_gen(/*@out@*/ uint8_t *rand, size_t len);
++int libscrypt_salt_gen(/*@out@*/ uint8_t *rand, size_t len);
+ 
+ /* Creates a hash of a passphrase using a randomly generated salt */
+ /* Returns >0 on success, or 0 for fail */
+-int SCRYPT_API libscrypt_hash(char *dst, const char* passphrase, uint32_t N, uint8_t r,
++int libscrypt_hash(char *dst, const char* passphrase, uint32_t N, uint8_t r,
+   uint8_t p);
++#endif
+ 
+ /* Checks a given MCF against a password */
+-int SCRYPT_API libscrypt_check(char *mcf, const char *password);
++int libscrypt_check(char *mcf, const char *password);
+ 
+ #ifdef __cplusplus
+ }
+@@ -71,7 +66,7 @@ int SCRYPT_API libscrypt_check(char *mcf, const char *password);
+    $pcL+DWle903AXcKJVwMffA== Salt is 16 bytes, or 24 in Base64
+    $dn+9ujljVc5JTJMC2fYu1ZEHdJyqYkOurmcrBQbMHUfnD6qxbTmNiR075ohNBZjvp66E2aV1pfOrmyNHUefjMg== Hash is 64 bytes, or 88 in Base64.
+    Work order, salt and hash have separators (3)
+-   3 + 6 + 24 + 88 + 3 + null byte = 125
++   3 + 6 + 24 + 88 + 3 + null byte = 25
+    This is rounded up to a multiple of four for alignment
+ */
+ #define SCRYPT_MCF_LEN 128
+diff --git a/libscryptConfig.cmake.in b/libscryptConfig.cmake.in
+deleted file mode 100644
+index 7746183..0000000
+--- a/libscryptConfig.cmake.in
++++ /dev/null
+@@ -1,3 +0,0 @@
+-@PACKAGE_INIT@
+-include("${CMAKE_CURRENT_LIST_DIR}/libscryptTargets.cmake")
+-check_required_components(libscrypt)
+diff --git a/main.c b/main.c
+index ba54799..ab5acec 100644
+--- a/main.c
++++ b/main.c
+@@ -5,7 +5,7 @@
+ 
+ #include "b64.h"
+ #include "crypto_scrypt-hexconvert.h"
+-#include "scrypt.h"
++#include "libscrypt.h"
+ 
+ #define REF1 "fdbabe1c9d3472007856e7190d01e9fe7c6ad7cbc8237830e77376634b3731622eaf30d92e22a3886ff109279d9830dac727afb94a83ee6d8360cbdfa2cc0640"
+ 
+diff --git a/sha256.c b/sha256.c
+index cae65db..279e3cf 100644
+--- a/sha256.c
++++ b/sha256.c
+@@ -173,6 +173,11 @@ SHA256_Transform(uint32_t * state, const unsigned char block[64])
+ 	/* 4. Mix local working variables into global state */
+ 	for (i = 0; i < 8; i++)
+ 		state[i] += S[i];
++
++	/* Clean the stack. */
++	memset(W, 0, 256);
++	memset(S, 0, 32);
++	t0 = t1 = 0;
+ }
+ 
+ static unsigned char PAD[64] = {
+@@ -315,6 +320,9 @@ libscrypt_HMAC_SHA256_Init(HMAC_SHA256_CTX * ctx, const void * _K, size_t Klen)
+ 	for (i = 0; i < Klen; i++)
+ 		pad[i] ^= K[i];
+ 	libscrypt_SHA256_Update(&ctx->octx, pad, 64);
++
++	/* Clean the stack. */
++	memset(khash, 0, 32);
+ }
+ 
+ /* Add bytes to the HMAC-SHA256 operation. */
+@@ -340,6 +348,9 @@ libscrypt_HMAC_SHA256_Final(unsigned char digest[32], HMAC_SHA256_CTX * ctx)
+ 
+ 	/* Finish the outer SHA256 operation. */
+ 	libscrypt_SHA256_Final(digest, &ctx->octx);
++
++	/* Clean the stack. */
++	memset(ihash, 0, 32);
+ }
+ 
+ /**
+@@ -394,4 +405,7 @@ libscrypt_PBKDF2_SHA256(const uint8_t * passwd, size_t passwdlen, const uint8_t
+ 			clen = 32;
+ 		memcpy(&buf[i * 32], T, clen);
+ 	}
++
++	/* Clean PShctx, since we never called _Final on it. */
++	memset(&PShctx, 0, sizeof(HMAC_SHA256_CTX));
+ }
+diff --git a/windows/VS2015/scrypt.sln b/windows/VS2015/scrypt.sln
+index 24f9635..4ad28f2 100644
+--- a/windows/VS2015/scrypt.sln
++++ b/windows/VS2015/scrypt.sln
+@@ -1,51 +1,51 @@
+-﻿
+-Microsoft Visual Studio Solution File, Format Version 12.00
+-# Visual Studio 14
+-VisualStudioVersion = 14.0.25420.1
+-MinimumVisualStudioVersion = 10.0.40219.1
+-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scryptlib", "scryptlib.vcxproj", "{41B96C94-B3B8-47C5-B058-8D2F7C80030E}"
+-EndProject
+-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scryptdll", "scryptdll.vcxproj", "{C022F40E-1E2C-4201-962F-56C146A5F9B4}"
+-	ProjectSection(ProjectDependencies) = postProject
+-		{41B96C94-B3B8-47C5-B058-8D2F7C80030E} = {41B96C94-B3B8-47C5-B058-8D2F7C80030E}
+-	EndProjectSection
+-EndProject
+-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scrypt_test", "scrypt_test.vcxproj", "{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}"
+-EndProject
+-Global
+-	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+-		Debug|x64 = Debug|x64
+-		Debug|x86 = Debug|x86
+-		Release|x64 = Release|x64
+-		Release|x86 = Release|x86
+-	EndGlobalSection
+-	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+-		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Debug|x64.ActiveCfg = Debug|x64
+-		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Debug|x64.Build.0 = Debug|x64
+-		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Debug|x86.ActiveCfg = Debug|Win32
+-		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Debug|x86.Build.0 = Debug|Win32
+-		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Release|x64.ActiveCfg = Release|x64
+-		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Release|x64.Build.0 = Release|x64
+-		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Release|x86.ActiveCfg = Release|Win32
+-		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Release|x86.Build.0 = Release|Win32
+-		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Debug|x64.ActiveCfg = Debug|x64
+-		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Debug|x64.Build.0 = Debug|x64
+-		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Debug|x86.ActiveCfg = Debug|Win32
+-		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Debug|x86.Build.0 = Debug|Win32
+-		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Release|x64.ActiveCfg = Release|x64
+-		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Release|x64.Build.0 = Release|x64
+-		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Release|x86.ActiveCfg = Release|Win32
+-		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Release|x86.Build.0 = Release|Win32
+-		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Debug|x64.ActiveCfg = Debug|x64
+-		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Debug|x64.Build.0 = Debug|x64
+-		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Debug|x86.ActiveCfg = Debug|Win32
+-		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Debug|x86.Build.0 = Debug|Win32
+-		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Release|x64.ActiveCfg = Release|x64
+-		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Release|x64.Build.0 = Release|x64
+-		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Release|x86.ActiveCfg = Release|Win32
+-		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Release|x86.Build.0 = Release|Win32
+-	EndGlobalSection
+-	GlobalSection(SolutionProperties) = preSolution
+-		HideSolutionNode = FALSE
+-	EndGlobalSection
+-EndGlobal
++﻿
++Microsoft Visual Studio Solution File, Format Version 12.00
++# Visual Studio 14
++VisualStudioVersion = 14.0.25420.1
++MinimumVisualStudioVersion = 10.0.40219.1
++Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scryptlib", "scryptlib.vcxproj", "{41B96C94-B3B8-47C5-B058-8D2F7C80030E}"
++EndProject
++Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scryptdll", "scryptdll.vcxproj", "{C022F40E-1E2C-4201-962F-56C146A5F9B4}"
++	ProjectSection(ProjectDependencies) = postProject
++		{41B96C94-B3B8-47C5-B058-8D2F7C80030E} = {41B96C94-B3B8-47C5-B058-8D2F7C80030E}
++	EndProjectSection
++EndProject
++Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scrypt_test", "scrypt_test.vcxproj", "{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}"
++EndProject
++Global
++	GlobalSection(SolutionConfigurationPlatforms) = preSolution
++		Debug|x64 = Debug|x64
++		Debug|x86 = Debug|x86
++		Release|x64 = Release|x64
++		Release|x86 = Release|x86
++	EndGlobalSection
++	GlobalSection(ProjectConfigurationPlatforms) = postSolution
++		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Debug|x64.ActiveCfg = Debug|x64
++		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Debug|x64.Build.0 = Debug|x64
++		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Debug|x86.ActiveCfg = Debug|Win32
++		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Debug|x86.Build.0 = Debug|Win32
++		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Release|x64.ActiveCfg = Release|x64
++		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Release|x64.Build.0 = Release|x64
++		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Release|x86.ActiveCfg = Release|Win32
++		{41B96C94-B3B8-47C5-B058-8D2F7C80030E}.Release|x86.Build.0 = Release|Win32
++		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Debug|x64.ActiveCfg = Debug|x64
++		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Debug|x64.Build.0 = Debug|x64
++		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Debug|x86.ActiveCfg = Debug|Win32
++		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Debug|x86.Build.0 = Debug|Win32
++		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Release|x64.ActiveCfg = Release|x64
++		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Release|x64.Build.0 = Release|x64
++		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Release|x86.ActiveCfg = Release|Win32
++		{C022F40E-1E2C-4201-962F-56C146A5F9B4}.Release|x86.Build.0 = Release|Win32
++		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Debug|x64.ActiveCfg = Debug|x64
++		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Debug|x64.Build.0 = Debug|x64
++		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Debug|x86.ActiveCfg = Debug|Win32
++		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Debug|x86.Build.0 = Debug|Win32
++		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Release|x64.ActiveCfg = Release|x64
++		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Release|x64.Build.0 = Release|x64
++		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Release|x86.ActiveCfg = Release|Win32
++		{E6BF581A-9E3F-4380-B31F-E30F033DEF0A}.Release|x86.Build.0 = Release|Win32
++	EndGlobalSection
++	GlobalSection(SolutionProperties) = preSolution
++		HideSolutionNode = FALSE
++	EndGlobalSection
++EndGlobal
+diff --git a/windows/VS2015/scrypt_test.vcxproj.filters b/windows/VS2015/scrypt_test.vcxproj.filters
+index c1cd58b..7fbf57d 100644
+--- a/windows/VS2015/scrypt_test.vcxproj.filters
++++ b/windows/VS2015/scrypt_test.vcxproj.filters
+@@ -1,6 +1,6 @@
+-﻿<?xml version="1.0" encoding="utf-8"?>
+-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+-  <ItemGroup>
+-    <ClCompile Include="..\..\main.c" />
+-  </ItemGroup>
++﻿<?xml version="1.0" encoding="utf-8"?>
++<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
++  <ItemGroup>
++    <ClCompile Include="..\..\main.c" />
++  </ItemGroup>
+ </Project>
+\ No newline at end of file
+diff --git a/windows/VS2015/scryptdll.vcxproj.filters b/windows/VS2015/scryptdll.vcxproj.filters
+index 8b0917b..d8c77f4 100644
+--- a/windows/VS2015/scryptdll.vcxproj.filters
++++ b/windows/VS2015/scryptdll.vcxproj.filters
+@@ -1,22 +1,22 @@
+-﻿<?xml version="1.0" encoding="utf-8"?>
+-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+-  <ItemGroup>
+-    <ClCompile Include="..\..\b64.c" />
+-    <ClCompile Include="..\..\crypto_scrypt-check.c" />
+-    <ClCompile Include="..\..\crypto_scrypt-hash.c" />
+-    <ClCompile Include="..\..\crypto_scrypt-hexconvert.c" />
+-    <ClCompile Include="..\..\crypto_scrypt-nosse.c" />
+-    <ClCompile Include="..\..\crypto-mcf.c" />
+-    <ClCompile Include="..\..\crypto-scrypt-saltgen.c" />
+-    <ClCompile Include="..\..\sha256.c" />
+-    <ClCompile Include="..\..\slowequals.c" />
+-  </ItemGroup>
+-  <ItemGroup>
+-    <ClInclude Include="..\..\b64.h" />
+-    <ClInclude Include="..\..\crypto_scrypt-hexconvert.h" />
+-    <ClInclude Include="..\..\libscrypt.h" />
+-    <ClInclude Include="..\..\sha256.h" />
+-    <ClInclude Include="..\..\slowequals.h" />
+-    <ClInclude Include="..\..\sysendian.h" />
+-  </ItemGroup>
++﻿<?xml version="1.0" encoding="utf-8"?>
++<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
++  <ItemGroup>
++    <ClCompile Include="..\..\b64.c" />
++    <ClCompile Include="..\..\crypto_scrypt-check.c" />
++    <ClCompile Include="..\..\crypto_scrypt-hash.c" />
++    <ClCompile Include="..\..\crypto_scrypt-hexconvert.c" />
++    <ClCompile Include="..\..\crypto_scrypt-nosse.c" />
++    <ClCompile Include="..\..\crypto-mcf.c" />
++    <ClCompile Include="..\..\crypto-scrypt-saltgen.c" />
++    <ClCompile Include="..\..\sha256.c" />
++    <ClCompile Include="..\..\slowequals.c" />
++  </ItemGroup>
++  <ItemGroup>
++    <ClInclude Include="..\..\b64.h" />
++    <ClInclude Include="..\..\crypto_scrypt-hexconvert.h" />
++    <ClInclude Include="..\..\libscrypt.h" />
++    <ClInclude Include="..\..\sha256.h" />
++    <ClInclude Include="..\..\slowequals.h" />
++    <ClInclude Include="..\..\sysendian.h" />
++  </ItemGroup>
+ </Project>
+\ No newline at end of file
+diff --git a/windows/VS2015/scryptlib.vcxproj.filters b/windows/VS2015/scryptlib.vcxproj.filters
+index 9cfa100..f2ab1f0 100644
+--- a/windows/VS2015/scryptlib.vcxproj.filters
++++ b/windows/VS2015/scryptlib.vcxproj.filters
+@@ -1,22 +1,22 @@
+-﻿<?xml version="1.0" encoding="utf-8"?>
+-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+-  <ItemGroup>
+-    <ClCompile Include="..\..\b64.c" />
+-    <ClCompile Include="..\..\crypto_scrypt-check.c" />
+-    <ClCompile Include="..\..\crypto_scrypt-hash.c" />
+-    <ClCompile Include="..\..\crypto_scrypt-hexconvert.c" />
+-    <ClCompile Include="..\..\crypto_scrypt-nosse.c" />
+-    <ClCompile Include="..\..\crypto-mcf.c" />
+-    <ClCompile Include="..\..\crypto-scrypt-saltgen.c" />
+-    <ClCompile Include="..\..\sha256.c" />
+-    <ClCompile Include="..\..\slowequals.c" />
+-  </ItemGroup>
+-  <ItemGroup>
+-    <ClInclude Include="..\..\b64.h" />
+-    <ClInclude Include="..\..\crypto_scrypt-hexconvert.h" />
+-    <ClInclude Include="..\..\sha256.h" />
+-    <ClInclude Include="..\..\slowequals.h" />
+-    <ClInclude Include="..\..\sysendian.h" />
+-    <ClInclude Include="..\..\scrypt.h" />
+-  </ItemGroup>
++﻿<?xml version="1.0" encoding="utf-8"?>
++<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
++  <ItemGroup>
++    <ClCompile Include="..\..\b64.c" />
++    <ClCompile Include="..\..\crypto_scrypt-check.c" />
++    <ClCompile Include="..\..\crypto_scrypt-hash.c" />
++    <ClCompile Include="..\..\crypto_scrypt-hexconvert.c" />
++    <ClCompile Include="..\..\crypto_scrypt-nosse.c" />
++    <ClCompile Include="..\..\crypto-mcf.c" />
++    <ClCompile Include="..\..\crypto-scrypt-saltgen.c" />
++    <ClCompile Include="..\..\sha256.c" />
++    <ClCompile Include="..\..\slowequals.c" />
++  </ItemGroup>
++  <ItemGroup>
++    <ClInclude Include="..\..\b64.h" />
++    <ClInclude Include="..\..\crypto_scrypt-hexconvert.h" />
++    <ClInclude Include="..\..\sha256.h" />
++    <ClInclude Include="..\..\slowequals.h" />
++    <ClInclude Include="..\..\sysendian.h" />
++    <ClInclude Include="..\..\scrypt.h" />
++  </ItemGroup>
+ </Project>
+\ No newline at end of file

@@ -1,16 +1,8 @@
 #include <stdlib.h>
-#include <string.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <float.h>
-#include <stdint.h>
-#include <math.h>
 
-#ifndef S_SPLINT_S /* Including this here triggers a known bug in splint */
-#include <unistd.h>
-#endif
-
-#include "libscrypt.h"
+#include "scrypt.h"
 
 /* ilog2 for powers of two */
 static uint32_t scrypt_ilog2(uint32_t n)
@@ -70,4 +62,4 @@ int libscrypt_mcf(uint32_t N, uint32_t r, uint32_t p, const char *salt,
 		return 0;
 
 	return 1;
-}	
+}
